@@ -108,8 +108,6 @@ button { cursor: pointer; }
 .users-table td:not(:first-child) { gap: 10px; justify-content: flex-start; text-align: left; }
 .user-modal textarea { background: #fff; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); display: block; font-size: 12px; line-height: 1.5; margin-top: 6px; min-height: 104px; padding: 11px; resize: vertical; width: 100%; }
 .user-modal input:focus, .user-modal select:focus, .user-modal textarea:focus { border-color: var(--blue-700); box-shadow: 0 0 0 3px #1764d126; outline: 0; }
-.user-modal label.whatsapp-consent-field { align-items: flex-start; color: #52657e; display: flex; font-size: 11px; font-weight: 500; gap: 9px; line-height: 1.45; }
-.user-modal label.whatsapp-consent-field input { accent-color: var(--blue-700); flex: 0 0 16px; height: 16px; margin: 0; padding: 0; width: 16px; }
 .product-description-field { background: #f8fbff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px 11px; }
 .product-description-field > span { color: var(--ink); display: block; font-size: 11px; font-weight: 700; }
 .product-description-field textarea { background: transparent; border: 0; margin-top: 4px; min-height: 92px; padding: 5px 0 0; }
@@ -249,9 +247,6 @@ button { cursor: pointer; }
 .sales-price input { display: block; margin-top: 7px; }
 .sales-client-label { margin: 13px 0 0; }
 .sales-client-label input { display: block; }
-.sales-whatsapp-contact { display: grid; gap: 12px; grid-template-columns: minmax(86px, .38fr) minmax(0, 1fr); }
-.sales-whatsapp-opt-in { align-items: flex-start; color: #52657e; display: flex; font-size: 11px; font-weight: 500; gap: 8px; line-height: 1.45; margin-top: 12px; }
-.sales-whatsapp-opt-in input { accent-color: var(--blue-700); flex: 0 0 16px; height: 16px; margin: 0; width: 16px; }
 .sales-client-picker { position: relative; }
 .sales-client-picker > input { background: #fff; border: 1px solid #bccbdb; border-radius: 7px; color: var(--ink); font-size: 16px; margin-top: 7px; min-height: 50px; outline: 0; padding: 10px 13px; width: 100%; }
 .sales-client-picker > input:focus { border-color: var(--blue-700); box-shadow: 0 0 0 3px #1764d126; }
@@ -448,14 +443,6 @@ button { cursor: pointer; }
 
 .client-phone-fields { display: grid; gap: 10px; grid-template-columns: minmax(92px, .38fr) minmax(0, 1fr); }
 .client-phone-fields label, .client-phone-fields input { min-width: 0; }
-.sales-whatsapp-contact { display: grid; gap: 12px; grid-template-columns: minmax(86px, .38fr) minmax(0, 1fr); }
-.sales-whatsapp-opt-in, .user-modal label.whatsapp-consent-field { align-items: flex-start; color: #52657e; display: flex; font-size: 11px; font-weight: 500; gap: 8px; line-height: 1.45; margin-top: 12px; }
-.sales-whatsapp-opt-in input, .user-modal label.whatsapp-consent-field input { accent-color: var(--blue-700); flex: 0 0 16px; height: 16px; margin: 0; padding: 0; width: 16px; }
-.history-whatsapp-button { align-items: center; background: #20b858; border: 1px solid #20b858; border-radius: 7px; color: #fff; display: inline-flex; height: 38px; justify-content: center; padding: 0; width: 38px; }
-.history-whatsapp-button:hover { background: #168c43; border-color: #168c43; }
-.history-whatsapp-button:disabled { cursor: not-allowed; opacity: .55; }
-.history-whatsapp-button:focus-visible { outline: 3px solid #20b85866; outline-offset: 2px; }
-.history-whatsapp-button svg { fill: none; height: 20px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; width: 20px; }
 .client-active-reservations { background: #f7f9fc; border: 1px solid var(--line); border-radius: 8px; list-style: none; margin: 16px 0 0; max-height: 220px; overflow-y: auto; padding: 0 12px; }
 .client-active-reservations li { align-items: center; border-bottom: 1px solid var(--line); display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; padding: 11px 0; }
 .client-active-reservations li:last-child { border-bottom: 0; }
@@ -485,8 +472,7 @@ button { cursor: pointer; }
 }
 
 @media (max-width: 480px) {
-  .sales-page .sales-fields-row,
-  .sales-page .sales-whatsapp-contact { grid-template-columns: minmax(0, 1fr); }
+  .sales-page .sales-fields-row { grid-template-columns: minmax(0, 1fr); }
 }
 
 .products-page .users-table { width: 100%; }
@@ -594,7 +580,7 @@ button { cursor: pointer; }
   }
   .clients-page .users-table td:first-child::before { display: none; }
   .clients-page .users-table td:first-child strong { font-size: 13px; }
-  .clients-page .users-table td[data-label="Celular / WhatsApp"] { grid-column: 1; }
+  .clients-page .users-table td[data-label="Celular"] { grid-column: 1; }
   .clients-page .users-table td[data-label="ID"] { grid-column: 2; }
   .clients-page .users-table .user-email-value {
     display: block;

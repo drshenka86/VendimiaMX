@@ -104,9 +104,6 @@ export default function Ventas() {
   const [clientSearch, setClientSearch] = useState("");
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [newClientName, setNewClientName] = useState("");
-  const [newClientCountryCode, setNewClientCountryCode] = useState("+52");
-  const [newClientPhone, setNewClientPhone] = useState("");
-  const [newClientWhatsappConsent, setNewClientWhatsappConsent] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [unitPrice, setUnitPrice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -345,9 +342,6 @@ export default function Ventas() {
       setClientSearch("");
       setClientDropdownOpen(false);
       setNewClientName("");
-      setNewClientCountryCode("+52");
-      setNewClientPhone("");
-      setNewClientWhatsappConsent(false);
       setQuantity(1);
       setUnitPrice("");
     } catch (closeError) {
@@ -361,14 +355,6 @@ export default function Ventas() {
   async function reserveProduct(event) {
     event.preventDefault();
     if (!canAssign || !selectedProduct) return;
-    if (clientChoice === "new" && newClientWhatsappConsent && !newClientPhone.replace(/\D/g, "")) {
-      setError("Agrega el celular del cliente antes de aceptar el envío de recibos por WhatsApp.");
-      return;
-    }
-    if (clientChoice === "new" && !/^\+[1-9]\d{0,2}$/.test(newClientCountryCode)) {
-      setError("Ingresa un código de país válido, por ejemplo +52.");
-      return;
-    }
 
     setSaving(true);
     setError("");
@@ -457,15 +443,11 @@ export default function Ventas() {
         };
 
         if (isNewClient) {
-          const phone = newClientPhone.replace(/\D/g, "").slice(0, 15) || null;
-          const acceptsWhatsApp = newClientWhatsappConsent && Boolean(phone);
           transaction.set(clientRef, {
             id: clientRef.id,
             nombre: customerName,
-            codigoPais: newClientCountryCode,
-            celular: phone,
-            aceptaWhatsApp: acceptsWhatsApp,
-            whatsappConsentAt: acceptsWhatsApp ? serverTimestamp() : null,
+            codigoPais: "+52",
+            celular: null,
             fecha_alta: serverTimestamp(),
             creadoPor: currentUser.uid,
           });
@@ -514,9 +496,6 @@ export default function Ventas() {
       setClientSearch("");
       setClientDropdownOpen(false);
       setNewClientName("");
-      setNewClientCountryCode("+52");
-      setNewClientPhone("");
-      setNewClientWhatsappConsent(false);
       setQuantity(1);
       setUnitPrice("");
       showToast(reservation.acumulado
@@ -730,14 +709,7 @@ export default function Ventas() {
                 </div>
                 <label className="sales-client-label" htmlFor="sales-client-search">Cliente</label>
                 {clientChoice === "new" ? (
-                  <>
-                    <label className="sales-client-label" htmlFor="new-client-name">Nombre<input id="new-client-name" maxLength={150} required value={newClientName} onChange={(event) => setNewClientName(event.target.value)} placeholder="Nombre" /></label>
-                    <div className="sales-whatsapp-contact">
-                      <label className="sales-client-label" htmlFor="new-client-country-code">Código de país<input id="new-client-country-code" type="tel" inputMode="tel" maxLength={4} pattern="\+[1-9][0-9]{0,2}" required value={newClientCountryCode} onChange={(event) => { setNewClientCountryCode(event.target.value); setNewClientWhatsappConsent(false); }} /></label>
-                      <label className="sales-client-label" htmlFor="new-client-phone">Celular / WhatsApp<input id="new-client-phone" type="tel" inputMode="tel" autoComplete="tel-national" maxLength={20} value={newClientPhone} onChange={(event) => { setNewClientPhone(event.target.value); setNewClientWhatsappConsent(false); }} placeholder="Número de contacto" /></label>
-                    </div>
-                    <label className="sales-whatsapp-opt-in"><input type="checkbox" checked={newClientWhatsappConsent} onChange={(event) => setNewClientWhatsappConsent(event.target.checked)} />El cliente autorizó recibir recibos por WhatsApp</label>
-                  </>
+                  <label className="sales-client-label" htmlFor="new-client-name">Nombre<input id="new-client-name" maxLength={150} required value={newClientName} onChange={(event) => setNewClientName(event.target.value)} placeholder="Nombre" /></label>
                 ) : (
                   <div className="sales-client-picker">
                     <input
@@ -765,7 +737,7 @@ export default function Ventas() {
                       placeholder="Buscar cliente..."
                     />
                     {clientDropdownOpen && <div className="sales-client-results" id="sales-client-options" role="listbox">
-                      <button type="button" className="sales-new-client-option" onClick={() => { setClientChoice("new"); setClientSearch(""); setClientDropdownOpen(false); setNewClientName(""); setNewClientCountryCode("+52"); setNewClientPhone(""); setNewClientWhatsappConsent(false); }}>+ Dar de alta un cliente</button>
+                      <button type="button" className="sales-new-client-option" onClick={() => { setClientChoice("new"); setClientSearch(""); setClientDropdownOpen(false); setNewClientName(""); }}>+ Dar de alta un cliente</button>
                       {matchingClients.map((client) => <button type="button" role="option" aria-selected={clientChoice === client.id} key={client.id} onClick={() => { setClientChoice(client.id); setClientSearch(client.nombre); setClientDropdownOpen(false); }}>{client.nombre}</button>)}
                       {!matchingClients.length && <span className="sales-no-client-results">No se encontraron clientes.</span>}
                     </div>}

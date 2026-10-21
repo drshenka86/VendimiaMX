@@ -335,7 +335,7 @@ service cloud.firestore {
       allow create: if isSalesOperator()
         && request.resource.data.keys().hasAll(['id', 'nombre', 'codigoPais', 'celular', 'fecha_alta', 'creadoPor'])
         && request.resource.data.keys().hasOnly([
-          'id', 'nombre', 'codigoPais', 'celular', 'aceptaWhatsApp', 'whatsappConsentAt', 'fecha_alta', 'creadoPor'
+          'id', 'nombre', 'codigoPais', 'celular', 'fecha_alta', 'creadoPor'
         ])
         && request.resource.data.id == clienteId
         && request.resource.data.codigoPais is string
@@ -346,17 +346,12 @@ service cloud.firestore {
         && (request.resource.data.celular == null
           || (request.resource.data.celular is string
             && request.resource.data.celular.size() <= 30))
-        && request.resource.data.aceptaWhatsApp is bool
-        && ((request.resource.data.aceptaWhatsApp == true
-            && request.resource.data.whatsappConsentAt == request.time)
-          || (request.resource.data.aceptaWhatsApp == false
-            && request.resource.data.whatsappConsentAt == null))
         && request.resource.data.fecha_alta == request.time
         && request.resource.data.creadoPor == request.auth.uid;
       allow update: if isAdmin()
         && request.resource.data.keys().hasAll(['id', 'nombre', 'codigoPais', 'celular'])
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'id', 'nombre', 'codigoPais', 'celular', 'aceptaWhatsApp', 'whatsappConsentAt'
+          'id', 'nombre', 'codigoPais', 'celular'
         ])
         && request.resource.data.id == clienteId
         && request.resource.data.codigoPais is string
@@ -366,12 +361,7 @@ service cloud.firestore {
         && request.resource.data.nombre.size() <= 150
         && (request.resource.data.celular == null
           || (request.resource.data.celular is string
-            && request.resource.data.celular.size() <= 30))
-        && request.resource.data.aceptaWhatsApp is bool
-        && ((request.resource.data.aceptaWhatsApp == true
-            && request.resource.data.whatsappConsentAt == request.time)
-          || (request.resource.data.aceptaWhatsApp == false
-            && request.resource.data.whatsappConsentAt == null));
+            && request.resource.data.celular.size() <= 30));
       allow delete: if false;
     }
 

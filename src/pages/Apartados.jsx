@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { httpsCallable } from "firebase/functions";
 import { collection, doc, getDoc, getDocs, orderBy, query, runTransaction, where, writeBatch } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { db, functions } from "../firebase";
+import { db } from "../firebase";
 import logo from "../public/logo-optimized.png";
 import AppNavigation from "../components/AppNavigation";
 import { loadReceiptPaymentSettings } from "../utils/receiptPaymentSettings";
@@ -263,25 +262,6 @@ export default function Apartados() {
     } catch (downloadError) {
       console.error("No se pudo generar el recibo PDF:", downloadError);
       showToast("No se pudo descargar el recibo. Inténtalo de nuevo.", "error");
-    } finally {
-      setReceiptActionId("");
-    }
-  }
-
-  async function sendClientReceiptWhatsapp(group) {
-    setReceiptActionId(group.id);
-    try {
-      const sendWhatsappReceipt = httpsCallable(functions, "sendWhatsappReceipt");
-      const result = await sendWhatsappReceipt({
-        clientId: group.clienteId,
-        sessionId: selectedSessionId,
-        paymentView,
-      });
-      if (!result.data?.accepted) throw new Error("WhatsApp no confirmó la solicitud.");
-      showToast("WhatsApp aceptó el recibo. La entrega puede tardar.");
-    } catch (sendError) {
-      console.error("No se pudo enviar el recibo por WhatsApp:", sendError);
-      showToast(sendError?.message || "No se pudo enviar el recibo por WhatsApp.", "error");
     } finally {
       setReceiptActionId("");
     }
@@ -579,9 +559,6 @@ export default function Apartados() {
                           </button>}
                           {group.visibleReservations.length > 0 && <button type="button" className="history-print-button history-icon-button" aria-label={`Descargar recibo de ${group.nombre}`} title={`Descargar recibo de ${group.nombre}`} disabled={receiptActionId === group.id} onClick={() => downloadClientReceipt(group)}>
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3" /></svg>
-                          </button>}
-                          {group.visibleReservations.length > 0 && <button type="button" className="history-print-button history-icon-button" aria-label={`Enviar recibo por WhatsApp a ${group.nombre}`} title={`Enviar recibo por WhatsApp a ${group.nombre}`} disabled={receiptActionId === group.id} onClick={() => sendClientReceiptWhatsapp(group)}>
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20l1-4.7A8.5 8.5 0 1 1 20.5 11.7Z" /><path d="M8.2 7.5c-.3.2-.7.8-.7 1.7s.7 1.9.8 2.1c.1.2 1.4 2.3 3.4 3.1 1.7.7 2 .5 2.4.5.4 0 1.3-.5 1.5-1 .2-.5.2-.9.1-1-.1-.1-.3-.2-.6-.3l-1.4-.7c-.2-.1-.4-.1-.5.1l-.7.8c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-2-1.2 7.5 7.5 0 0 1-1.4-1.8c-.1-.2 0-.4.1-.5l.5-.6c.1-.2.2-.3.2-.5l-.6-1.5c-.1-.3-.3-.4-.5-.4h-.5Z" /></svg>
                           </button>}
                           {paymentView === "PENDIENTES" && group.pending.length > 0 && <button type="button" className="users-primary-button" disabled={saving || !group.clienteId} onClick={() => setClientToSettle(group)}>Liquidar cuenta</button>}
                         </div>
