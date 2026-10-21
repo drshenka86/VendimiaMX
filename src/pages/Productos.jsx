@@ -55,58 +55,55 @@ export default function Productos() {
   const [toast, setToast] = useState("");
   const [toastError, setToastError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function cargarPerfil() {
+    let mounted = true;
+
+    async function loadInitialData() {
       if (!currentUser) {
+        setLoading(false);
         return;
       }
 
-      try {
-        const usuarioRef = doc(db, "usuarios", currentUser.uid);
-        const usuarioSnap = await getDoc(usuarioRef);
+      const [profileResult, productsResult, palletsResult] = await Promise.allSettled([
+        getDoc(doc(db, "usuarios", currentUser.uid)),
+        getDocs(collection(db, "productos")),
+        getDocs(collection(db, "pallets")),
+      ]);
+      if (!mounted) return;
 
-        if (usuarioSnap.exists()) {
-          setPerfil(usuarioSnap.data());
-        } else {
-          setError("No se encontró el perfil del usuario.");
-        }
-      } catch (err) {
-        console.error(err);
-        setError("No se pudo cargar el perfil.");
+      const errors = [];
+      if (profileResult.status === "fulfilled") {
+        if (profileResult.value.exists()) setPerfil(profileResult.value.data());
+        else errors.push("No se encontró el perfil del usuario.");
+      } else {
+        console.error("No se pudo cargar el perfil:", profileResult.reason);
+        errors.push("No se pudo cargar el perfil.");
       }
-    }
 
-    async function cargarProductos() {
-      try {
-        const snapshot = await getDocs(collection(db, "productos"));
-        const registros = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-        setProductos(registros);
-      } catch (err) {
-        console.error(err);
-        setProductos([]);
-        setError("No se pudo consultar la colección de productos.");
+      if (productsResult.status === "fulfilled") {
+        setProductos(productsResult.value.docs.map((item) => ({ id: item.id, ...item.data() })));
+      } else {
+        console.error("No se pudieron cargar los productos:", productsResult.reason);
+        errors.push("No se pudo consultar la colección de productos.");
       }
-    }
 
-    async function cargarPallets() {
-      try {
-        const snapshot = await getDocs(collection(db, "pallets"));
-        const registros = snapshot.docs
+      if (palletsResult.status === "fulfilled") {
+        setPallets(palletsResult.value.docs
           .map((item) => ({ id: item.id, ...item.data() }))
           .filter((pallet) => String(pallet.estatus || "").toLowerCase() === "activo")
-          .sort((a, b) => String(a.codigo || a.id).localeCompare(String(b.codigo || b.id)));
-        setPallets(registros);
-      } catch (err) {
-        console.error(err);
-        setPallets([]);
-        setError("No se pudo consultar la colección de pallets.");
+          .sort((a, b) => String(a.codigo || a.id).localeCompare(String(b.codigo || b.id))));
+      } else {
+        console.error("No se pudieron cargar los pallets:", palletsResult.reason);
+        errors.push("No se pudo consultar la colección de pallets.");
       }
+      setError(errors.join(" "));
+      setLoading(false);
     }
 
-    cargarPerfil();
-    cargarProductos();
-    cargarPallets();
+    loadInitialData();
+    return () => { mounted = false; };
   }, [currentUser]);
 
   const nombre = perfil?.nombre || currentUser?.displayName || "Usuario";
@@ -346,7 +343,7 @@ export default function Productos() {
           </div>
 
           <div className="users-table-wrap">
-            {productosVisibles.length ? (
+            {loading ? <div className="users-empty">Cargando productos...</div> : productosVisibles.length ? (
               <table className="users-table products-table">
                 <thead>
                   <tr>

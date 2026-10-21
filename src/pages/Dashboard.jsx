@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [apartados, setApartados] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [financeLoading, setFinanceLoading] = useState(true);
   const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -33,6 +34,7 @@ export default function Dashboard() {
 
     async function loadDashboard() {
       setLoading(true);
+      setFinanceLoading(true);
       setError("");
       try {
         const [profileSnapshot, productsSnapshot, palletsSnapshot] = await Promise.all([
@@ -46,8 +48,12 @@ export default function Dashboard() {
         setPerfil(userProfile);
         setProductos(productsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
         setPallets(palletsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+        setLoading(false);
 
-        if (!salesRole(userProfile?.rol) || userProfile?.activo !== true) return;
+        if (!salesRole(userProfile?.rol) || userProfile?.activo !== true) {
+          setFinanceLoading(false);
+          return;
+        }
 
         const [activeSessionSnapshot, reservationsSnapshot] = await Promise.all([
           getDoc(doc(db, "configuracionVentas", "sesionActiva")),
@@ -61,7 +67,10 @@ export default function Dashboard() {
         console.error("No se pudo cargar el resumen del negocio:", loadError);
         if (mounted) setError("No se pudo cargar toda la información del negocio. Verifica la conexión y los permisos de Firestore.");
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          setFinanceLoading(false);
+        }
       }
     }
 
@@ -204,7 +213,7 @@ export default function Dashboard() {
 
         <section className="business-heading">
           <div><p>LA VENDIMIA MX</p><h1>Resumen del negocio</h1><span>Capital, cobranza y rentabilidad</span></div>
-          <div className={`business-live-status${activeSessionId ? " is-open" : ""}`}><i />{activeSessionId ? "ID de Venta activo" : "Sin ID de Venta activo"}</div>
+          <div className={`business-live-status${activeSessionId ? " is-open" : ""}`}><i />{financeLoading ? "Cargando ventas…" : activeSessionId ? "ID de Venta activo" : "Sin ID de Venta activo"}</div>
         </section>
         {error && <div className="dashboard-alert" role="alert">{error}</div>}
 
@@ -219,7 +228,7 @@ export default function Dashboard() {
           {puedeOperarVentas && <>
             <section className="business-finance-section" aria-label="Recuperación del capital">
               <div className="business-finance-heading"><div><p>FLUJO DE CAPITAL</p><h2>Recuperación de la inversión</h2></div></div>
-              <div className="business-metrics finance-metrics">
+              {financeLoading ? <div className="business-loading">Cargando datos financieros...</div> : <><div className="business-metrics finance-metrics">
                 <article className="business-metric"><span>Inversión registrada</span><strong>{money.format(rentabilidad.inversionRegistrada)}</strong><small>Costo + envío de pallets no cancelados</small><i className="metric-mark blue" /></article>
                 <article className="business-metric"><span>Capital recuperado</span><strong>{money.format(rentabilidad.capitalRecuperado)}</strong><small>{apartadosResumen.pagados} apartados marcados como pagados</small><i className="metric-mark green" /></article>
                 <article className="business-metric"><span>Capital por recuperar</span><strong>{money.format(rentabilidad.capitalPorRecuperar)}</strong><small>Inversión menos cobros registrados</small><i className="metric-mark coral" /></article>
@@ -228,18 +237,18 @@ export default function Dashboard() {
               <div className="business-capital-progress">
                 <div><span>Recuperación del capital invertido</span><strong>{rentabilidad.recuperacionPercent.toFixed(0)}%</strong></div>
                 <div className="business-capital-progress-track" role="progressbar" aria-label="Porcentaje de capital recuperado" aria-valuemin="0" aria-valuemax="100" aria-valuenow={rentabilidad.recuperacionPercent}><span style={{ width: `${rentabilidad.recuperacionPercent}%` }} /></div>
-              </div>
+              </div></>}
             </section>
 
             <section className="business-finance-section" aria-label="Proyección de ganancias">
               <div className="business-finance-heading"><div><p>RENTABILIDAD</p><h2>Ganancia bruta por etapa</h2></div></div>
-              <div className="business-metrics finance-metrics">
+              {financeLoading ? <div className="business-loading">Calculando proyección...</div> : <><div className="business-metrics finance-metrics">
                 <article className="business-metric"><span>Ganancia cobrada</span><strong>{money.format(rentabilidad.gananciaCobrada)}</strong><small>Utilidad estimada de apartados pagados</small><i className="metric-mark green" /></article>
                 <article className="business-metric"><span>Ganancia por cobrar</span><strong>{money.format(rentabilidad.gananciaPendiente)}</strong><small>Utilidad estimada de apartados pendientes</small><i className="metric-mark gold" /></article>
                 <article className="business-metric"><span>Ganancia en inventario</span><strong>{money.format(rentabilidad.gananciaInventario)}</strong><small>Si se vende al precio actual</small><i className="metric-mark blue" /></article>
                 <article className="business-metric"><span>Ganancia bruta potencial</span><strong>{money.format(rentabilidad.gananciaPotencial)}</strong><small>Cobrado + pendiente + inventario</small><i className="metric-mark coral" /></article>
               </div>
-              <p className="business-finance-note">Utilidad bruta estimada con el costo unitario actual de cada producto; si se edita, cambia la estimación histórica. Excluye {rentabilidad.unidadesSinCosto} unidades sin costo y no descuenta envío ni otros gastos.</p>
+              <p className="business-finance-note">Utilidad bruta estimada con el costo unitario actual de cada producto; si se edita, cambia la estimación histórica. Excluye {rentabilidad.unidadesSinCosto} unidades sin costo y no descuenta envío ni otros gastos.</p></>}
             </section>
           </>}
 
@@ -250,15 +259,15 @@ export default function Dashboard() {
             </section>
 
             {puedeOperarVentas && <section className="business-panel">
-              <div className="business-panel-heading"><div><p>VENTAS EN VIVO</p><h2>{activeSessionId ? "Actividad pendiente" : "Actividad reciente"}</h2></div><button className="business-link-button" onClick={() => navigate("/ventas")}>Ver apartados <span aria-hidden="true">→</span></button></div>
-              {apartadosRecientes.length ? <div className="business-reservation-list">{apartadosRecientes.map((apartado) => <article key={apartado.id}><div><strong>{apartado.codigoProducto}</strong><span>{apartado.nombreCliente}</span></div><b>{money.format(Number(apartado.cantidad || 0) * Number(apartado.precioUnitario || 0))}</b><small>{apartado.producto} · {apartado.cantidad} {apartado.cantidad === 1 ? "unidad" : "unidades"} · {formatDate(apartado.fechaApartado)}</small></article>)}</div> : <div className="business-empty">No hay apartados pendientes de pago.</div>}
+              <div className="business-panel-heading"><div><p>VENTAS EN VIVO</p><h2>{financeLoading ? "Cargando actividad" : activeSessionId ? "Actividad pendiente" : "Actividad reciente"}</h2></div><button className="business-link-button" onClick={() => navigate("/ventas")}>Ver apartados <span aria-hidden="true">→</span></button></div>
+              {financeLoading ? <div className="business-loading">Cargando actividad de ventas...</div> : apartadosRecientes.length ? <div className="business-reservation-list">{apartadosRecientes.map((apartado) => <article key={apartado.id}><div><strong>{apartado.codigoProducto}</strong><span>{apartado.nombreCliente}</span></div><b>{money.format(Number(apartado.cantidad || 0) * Number(apartado.precioUnitario || 0))}</b><small>{apartado.producto} · {apartado.cantidad} {apartado.cantidad === 1 ? "unidad" : "unidades"} · {formatDate(apartado.fechaApartado)}</small></article>)}</div> : <div className="business-empty">No hay apartados pendientes de pago.</div>}
             </section>}
           </div>
 
           <section className="business-quick-actions" aria-label="Acciones frecuentes">
             <div><span>Acciones</span><p>Continúa con la operación del negocio.</p></div>
             <button onClick={() => navigate("/productos")}>Abrir catálogo</button>
-            {puedeOperarVentas && <button className="primary" onClick={() => navigate("/venta")}>{activeSessionId ? "Continuar venta" : "Iniciar venta"}</button>}
+            {puedeOperarVentas && <button className="primary" disabled={financeLoading} onClick={() => navigate("/venta")}>{financeLoading ? "Cargando venta..." : activeSessionId ? "Continuar venta" : "Iniciar venta"}</button>}
           </section>
         </>}
       </main>

@@ -8,7 +8,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, authError } = useAuth();
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
@@ -32,7 +32,7 @@ export default function Login() {
           <img className="login-logo" src={logo} alt="La Vendimia" />
         </div>
         <div className="login-card-content">
-          {error && <p className="error">{error}</p>}
+          {(authError || error) && <p className="error">{authError || error}</p>}
           <form onSubmit={handleSubmit}>
             <label htmlFor="email">Correo electrónico</label>
             <input
@@ -50,7 +50,7 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <button type="submit" disabled={loading}>
+            <button type="submit" disabled={loading || Boolean(authError)}>
               {loading ? "Ingresando..." : "Acceder"}
             </button>
           </form>

@@ -35,6 +35,14 @@ function normalize(value) {
   return String(value || "").trim().toLocaleLowerCase("es-MX").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+function pendingBalance(reservations) {
+  return reservations.reduce((total, reservation) => (
+    reservation.estatus === "APARTADO"
+      ? total + Number(reservation.cantidad || 0) * Number(reservation.precioUnitario || 0)
+      : total
+  ), 0);
+}
+
 export default function Apartados() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -74,11 +82,25 @@ export default function Apartados() {
           return;
         }
 
-        const sessionsSnapshot = await getDocs(query(collection(db, "sesionesVenta"), orderBy("fechaInicio", "desc")));
+        const [sessionsSnapshot, pendingReservationsSnapshot] = await Promise.all([
+          getDocs(query(collection(db, "sesionesVenta"), orderBy("fechaInicio", "desc"))),
+          getDocs(query(collection(db, "apartados"), where("estatus", "==", "APARTADO"))),
+        ]);
         if (!mounted) return;
         const sessionRecords = sessionsSnapshot.docs.map(toRecord);
-        setSessions(sessionRecords);
-        setSelectedSessionId(sessionRecords[0]?.id || "");
+        const balancesBySession = new Map();
+        for (const reservation of pendingReservationsSnapshot.docs.map(toRecord)) {
+          const balance = Number(reservation.cantidad || 0) * Number(reservation.precioUnitario || 0);
+          if (balance > 0) {
+            balancesBySession.set(
+              reservation.idVenta,
+              (balancesBySession.get(reservation.idVenta) || 0) + balance,
+            );
+          }
+        }
+        const sessionsWithBalance = sessionRecords.filter((session) => (balancesBySession.get(session.id) || 0) > 0);
+        setSessions(sessionsWithBalance);
+        setSelectedSessionId(sessionsWithBalance[0]?.id || "");
       } catch (loadError) {
         console.error(loadError);
         if (mounted) setError("No se pudieron cargar los IDs de Venta. Verifica las reglas de Firestore y tu conexión.");
@@ -186,6 +208,16 @@ export default function Apartados() {
   function showToast(message, type = "success") {
     setToast({ message, type });
     window.setTimeout(() => setToast(null), type === "error" ? 5000 : 3500);
+  }
+
+  function removeSelectedSessionIfSettled(remainingBalance) {
+    if (remainingBalance > 0) return;
+    const remainingSessions = sessions.filter((session) => session.id !== selectedSessionId);
+    setSessions(remainingSessions);
+    setSelectedSessionId(remainingSessions[0]?.id || "");
+    setPaymentView("PENDIENTES");
+    setClientFilter("");
+    setReservationPage(1);
   }
 
   function getClientReceipt(group, paymentSettings) {
@@ -430,6 +462,7 @@ export default function Apartados() {
       setSessions((current) => current.map((item) => item.id === deleted.idVenta
         ? { ...item, apartadosActivos: Math.max(0, Number(item.apartadosActivos || 0) - 1) }
         : item));
+      removeSelectedSessionIfSettled(pendingBalance(reservations.filter((item) => item.id !== deleted.id)));
       setReservationToDelete(null);
       showToast("Apartado eliminado; las unidades volvieron al inventario.");
     } catch (deleteError) {
@@ -459,8 +492,14 @@ export default function Apartados() {
         && reservation.estatus === "APARTADO"
         ? { ...reservation, estatus: "PAGADO" }
         : reservation));
+      const remainingBalance = pendingBalance(reservations.filter((reservation) => (
+        reservation.idVenta !== selectedSessionId
+        || reservation.idCliente !== clientToSettle.clienteId
+        || reservation.estatus !== "APARTADO"
+      )));
+      removeSelectedSessionIfSettled(remainingBalance);
       setClientToSettle(null);
-      setPaymentView("PAGADOS");
+      if (remainingBalance > 0) setPaymentView("PAGADOS");
       showToast(`${clientToSettle.pending.length} apartados marcados como pagados.`);
     } catch (paymentError) {
       console.error(paymentError);
@@ -489,12 +528,12 @@ export default function Apartados() {
         </header>
         {profileOpen && <section className="profile-popover" aria-label="Menú de perfil"><div className="profile-popover-head"><span className="avatar profile-popover-avatar">{initials}</span><strong>{name}</strong><span>{profile?.rol || "Usuario"}</span><small>{profile?.email || currentUser?.email}</small></div><div className="profile-popover-bottom"><button onClick={handleLogout}>↪ <span>Cerrar sesión</span></button></div></section>}
 
-        <section className="sales-heading"><div><p>HISTORIAL</p><h1>Ventas</h1></div><div className="sales-session-status"><span />{sessions.length} {sessions.length === 1 ? "ID registrado" : "IDs registrados"}</div></section>
+        <section className="sales-heading"><div><p>HISTORIAL</p><h1>Apartados</h1></div><div className="sales-session-status"><span />{sessions.length} {sessions.length === 1 ? "ID con saldo" : "IDs con saldo"}</div></section>
         {error && <div className="dashboard-alert" role="alert">{error}</div>}
         {loading ? <div className="sales-loading">Cargando IDs de Venta...</div> : !salesRole(profile?.rol) || profile?.activo !== true ? (
           <section className="sales-empty-state"><h2>Acceso no disponible</h2><p>Esta página está habilitada para usuarios Administrador y Vendedor activos.</p></section>
         ) : sessions.length === 0 ? (
-          <section className="sales-empty-state"><h2>Aún no hay IDs de Venta</h2><p>Al cerrar un ID desde la página Venta, quedará disponible aquí con sus apartados.</p><button className="users-primary-button history-go-to-sale" onClick={() => navigate("/venta")}>Ir a Venta</button></section>
+          <section className="sales-empty-state"><h2>No hay IDs de Venta con saldo pendiente</h2><p>Solo se muestran IDs que tienen apartados pendientes por cobrar.</p><button className="users-primary-button history-go-to-sale" onClick={() => navigate("/venta")}>Ir a Venta</button></section>
         ) : <>
           <section className="history-session-toolbar"><label htmlFor="history-session-select">ID de Venta</label><select id="history-session-select" value={selectedSessionId} onChange={(event) => { setSelectedSessionId(event.target.value); setClientFilter(""); setPaymentView("PENDIENTES"); setReservationPage(1); setReservationToEdit(null); setReservationToDelete(null); setClientToSettle(null); }}>{sessions.map((item) => <option key={item.id} value={item.id}>{formatDate(item.fechaInicio)}</option>)}</select></section>
 

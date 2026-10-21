@@ -24,35 +24,44 @@ export default function Usuarios() {
   const [toast, setToast] = useState("");
   const [toastError, setToastError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [newUser, setNewUser] = useState({ nombre: "", email: "", rol: "Consulta" });
   const [editingUser, setEditingUser] = useState(null);
   const [userToDeactivate, setUserToDeactivate] = useState(null);
 
   useEffect(() => {
+    let mounted = true;
+
     async function cargarUsuarios() {
-      try {
-        const snapshot = await getDocs(collection(db, "usuarios"));
-        const registros = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-        setUsuarios(registros);
-      } catch (err) {
-        console.error(err);
-        setUsuarios([]);
-        const codigo = err?.code || "unknown";
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      const [usersResult, profileResult] = await Promise.allSettled([
+        getDocs(collection(db, "usuarios")),
+        getDoc(doc(db, "usuarios", currentUser.uid)),
+      ]);
+      if (!mounted) return;
+
+      if (usersResult.status === "fulfilled") {
+        setUsuarios(usersResult.value.docs.map((item) => ({ id: item.id, ...item.data() })));
+      } else {
+        console.error("No se pudo consultar la colección de usuarios:", usersResult.reason);
+        const codigo = usersResult.reason?.code || "unknown";
         setError(`No se pudo consultar la colección de usuarios (${codigo}).`);
       }
 
-      if (currentUser) {
-        try {
-          const perfilSnapshot = await getDoc(doc(db, "usuarios", currentUser.uid));
-          if (perfilSnapshot.exists()) {
-            setPerfil(perfilSnapshot.data());
-          }
-        } catch (err) {
-          console.error("No se pudo cargar el perfil del usuario:", err);
-        }
+      if (profileResult.status === "fulfilled") {
+        if (profileResult.value.exists()) setPerfil(profileResult.value.data());
+      } else {
+        console.error("No se pudo cargar el perfil del usuario:", profileResult.reason);
       }
+      setLoading(false);
     }
+
     cargarUsuarios();
+    return () => { mounted = false; };
   }, [currentUser]);
 
   const nombre = perfil?.nombre || currentUser?.displayName || "Usuario";
@@ -159,7 +168,7 @@ export default function Usuarios() {
         {error && <div className="dashboard-alert">{error}</div>}
         <section className="users-card">
           <div className="users-toolbar"><label className="users-search"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar usuario..." aria-label="Buscar usuario" /></label><span className="users-count">{usuariosFiltrados.length} usuarios</span></div>
-          <div className="users-table-wrap">{usuariosVisibles.length ? <table className="users-table"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{usuariosVisibles.map((usuario) => { const administrador = esAdministrador(usuario.rol); const esPropio = usuario.id === currentUser?.uid; const puedeEditar = !administradorActual || !administrador || esPropio; return <tr key={usuario.id || usuario.email}><td data-label="Nombre"><strong><SearchHighlight value={usuario.nombre || "Sin nombre"} query={query} /></strong></td><td data-label="Correo"><span className="user-email-value"><SearchHighlight value={usuario.email || "-"} query={query} /></span></td><td data-label="Rol"><span className="role-pill"><SearchHighlight value={usuario.rol || "Sin rol"} query={query} /></span></td><td data-label="Estado"><span className={`status-pill ${usuario.activo === false ? "inactive" : ""}`}>{usuario.activo === false ? "Inactivo" : "Activo"}</span></td><td data-label="Acciones"><button className="table-action" disabled={!puedeEditar} onClick={() => handleEditUser(usuario)}>Editar</button>{usuario.activo === false ? <button className="table-action activate" onClick={() => setUserToDeactivate({ ...usuario, accion: "activar" })}>Activar</button> : <button className="table-action danger" disabled={administrador} onClick={() => setUserToDeactivate({ ...usuario, accion: "desactivar" })}>Desactivar</button>}</td></tr>; })}</tbody></table> : <div className="users-empty">{error || (query ? "No hay usuarios que coincidan con la búsqueda." : "No hay usuarios registrados en Firebase.")}</div>}</div>
+          <div className="users-table-wrap">{loading ? <div className="users-empty">Cargando usuarios...</div> : usuariosVisibles.length ? <table className="users-table"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{usuariosVisibles.map((usuario) => { const administrador = esAdministrador(usuario.rol); const esPropio = usuario.id === currentUser?.uid; const puedeEditar = !administradorActual || !administrador || esPropio; return <tr key={usuario.id || usuario.email}><td data-label="Nombre"><strong><SearchHighlight value={usuario.nombre || "Sin nombre"} query={query} /></strong></td><td data-label="Correo"><span className="user-email-value"><SearchHighlight value={usuario.email || "-"} query={query} /></span></td><td data-label="Rol"><span className="role-pill"><SearchHighlight value={usuario.rol || "Sin rol"} query={query} /></span></td><td data-label="Estado"><span className={`status-pill ${usuario.activo === false ? "inactive" : ""}`}>{usuario.activo === false ? "Inactivo" : "Activo"}</span></td><td data-label="Acciones"><button className="table-action" disabled={!puedeEditar} onClick={() => handleEditUser(usuario)}>Editar</button>{usuario.activo === false ? <button className="table-action activate" onClick={() => setUserToDeactivate({ ...usuario, accion: "activar" })}>Activar</button> : <button className="table-action danger" disabled={administrador} onClick={() => setUserToDeactivate({ ...usuario, accion: "desactivar" })}>Desactivar</button>}</td></tr>; })}</tbody></table> : <div className="users-empty">{error || (query ? "No hay usuarios que coincidan con la búsqueda." : "No hay usuarios registrados en Firebase.")}</div>}</div>
           <div className="users-footer"><span>Mostrando {usuariosFiltrados.length ? (paginaUsuarios - 1) * 10 + 1 : 0}-{Math.min(paginaUsuarios * 10, usuariosFiltrados.length)} de {usuariosFiltrados.length}</span><div className="pagination"><button disabled={paginaUsuarios === 1} onClick={() => setUserPage((pagina) => Math.max(1, pagina - 1))}>‹</button><button className="current">{paginaUsuarios}</button><button disabled={paginaUsuarios === totalUserPages} onClick={() => setUserPage((pagina) => Math.min(totalUserPages, pagina + 1))}>›</button></div></div>
         </section>
       </main>

@@ -9,6 +9,8 @@ Currently, two official plugins are available:
 
 El frontend está preparado para desplegarse como SPA en Vercel. `vercel.json` configura el rewrite necesario para que las rutas de React funcionen al refrescar la página.
 
+La autenticación usa persistencia de sesión del navegador: permanece activa al cambiar de página o recargar la pestaña y se elimina al cerrar la sesión del navegador. Esto no cierra el ID de Venta compartido.
+
 La administración de usuarios y la eliminación segura de productos/clientes dependen de Cloud Functions (`createManagedUser`, `deleteProductSafely` y `deleteClientSafely`). Deben desplegarse antes de publicar una versión del frontend que use esas acciones.
 
 ### Despliegue
