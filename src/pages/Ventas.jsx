@@ -274,12 +274,27 @@ export default function Ventas() {
         });
         transaction.set(activeRef, { idVenta: sessionRef.id });
       });
-      await refreshWorkspace();
+      setSession({
+        id: sessionRef.id,
+        estatus: "ABIERTA",
+        apartadosActivos: 0,
+        ultimoApartadoId: null,
+        fechaInicio: Date.now(),
+        fechaCierre: null,
+        creadoPor: currentUser.uid,
+      });
+      setSessionIsActive(true);
+      setReservations([]);
       showToast("ID de Venta iniciado. Ya puedes registrar apartados.");
     } catch (startError) {
       console.error(startError);
-      showToast(getErrorMessage(startError), "error");
-      await refreshWorkspace().catch(() => {});
+      try {
+        await refreshWorkspace();
+        showToast(getErrorMessage(startError), "error");
+      } catch (refreshError) {
+        console.error("No se pudo actualizar el estado de la sesión de venta:", refreshError);
+        showToast(`${getErrorMessage(startError)} No se pudo actualizar el estado de la sesión; recarga la página.`, "error");
+      }
     } finally {
       setSaving(false);
     }
