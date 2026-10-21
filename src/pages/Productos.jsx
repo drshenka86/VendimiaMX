@@ -312,7 +312,7 @@ export default function Productos() {
   }
 
   return (
-    <div className="app-shell users-page">
+    <div className="app-shell users-page products-page">
       <AppNavigation activePage="productos" menuOpen={menuOpen} onClose={setMenuOpen} showUsers={puedeAdministrarUsuarios} showSales={puedeOperarVentas} />
 
       <main className="dashboard-main" id="productos">

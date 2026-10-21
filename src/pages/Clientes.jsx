@@ -289,7 +289,7 @@ export default function Clientes() {
   }
 
   return (
-    <div className="app-shell users-page">
+    <div className="app-shell users-page clients-page">
       <AppNavigation activePage="clientes" menuOpen={menuOpen} onClose={setMenuOpen} showUsers showSales showClients />
 
       <main className="dashboard-main" id="clientes">

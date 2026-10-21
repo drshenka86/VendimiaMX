@@ -479,3 +479,148 @@ button { cursor: pointer; }
   .products-table td:last-child { align-items: center; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; padding-top: 7px; }
   .products-table .table-action { margin: 0; }
 }
+
+@media (max-width: 768px) {
+  .sidebar-overlay.is-visible { opacity: 1; pointer-events: auto; }
+}
+
+@media (max-width: 480px) {
+  .sales-page .sales-fields-row,
+  .sales-page .sales-whatsapp-contact { grid-template-columns: minmax(0, 1fr); }
+}
+
+.products-page .users-table { width: 100%; }
+
+@media (max-width: 768px) {
+  .products-page .users-heading { align-items: stretch; }
+  .products-page .page-actions { gap: 8px; }
+  .products-page .users-toolbar { gap: 10px; }
+  .products-page .users-count { align-self: flex-start; }
+  .products-page .users-table-wrap { overflow: visible; padding: 0 12px 12px; }
+  .products-page .products-table,
+  .products-page .products-table tbody { display: block; width: 100%; }
+  .products-page .products-table tr {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+  }
+  .products-page .products-table tr:last-child { border-bottom: 1px solid var(--line); }
+  .products-page .products-table td {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    min-height: 34px;
+    padding: 5px 0;
+    text-align: right;
+    width: auto;
+  }
+  .products-page .products-table td:first-child {
+    border-bottom: 1px solid #edf1f6;
+    display: block;
+    margin-bottom: 5px;
+    padding: 2px 0 9px;
+    text-align: left;
+  }
+  .products-page .products-table td:first-child strong { font-size: 13px; }
+  .products-page .products-table td::before {
+    flex: 0 0 auto;
+    font-size: 10px;
+    text-align: left;
+  }
+  .products-page .products-table td:first-child::before { display: none; }
+  .products-page .products-table td[data-label="Producto"] strong {
+    max-width: 68%;
+    overflow-wrap: anywhere;
+    text-align: right;
+  }
+  .products-page .products-table td[data-label="Acciones"] {
+    border-top: 1px solid #edf1f6;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin-top: 4px;
+    padding-top: 10px;
+  }
+  .products-page .products-table td[data-label="Acciones"]::before { margin-right: auto; }
+  .products-page .products-table .table-action { font-size: 11px; min-height: 38px; padding: 8px 12px; }
+  .products-page .users-footer { gap: 10px; padding: 12px 14px; }
+  .products-page .user-modal input,
+  .products-page .user-modal select,
+  .products-page .user-modal textarea { font-size: 16px; }
+}
+
+@media (max-width: 380px) {
+  .products-page .users-footer { align-items: flex-start; flex-direction: column; }
+}
+
+.clients-page .users-table { width: 100%; }
+
+@media (max-width: 768px) {
+  .clients-page .users-heading { align-items: stretch; }
+  .clients-page .users-table-wrap { overflow: visible; padding: 0 12px 12px; }
+  .clients-page .users-table,
+  .clients-page .users-table tbody { display: block; width: 100%; }
+  .clients-page .users-table tr {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: grid;
+    gap: 8px 12px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    margin-bottom: 10px;
+    padding: 11px 12px;
+  }
+  .clients-page .users-table tr:last-child { border-bottom: 1px solid var(--line); }
+  .clients-page .users-table td {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 4px 0;
+    width: auto;
+  }
+  .clients-page .users-table td::before {
+    flex: none;
+    font-size: 9px;
+    text-align: left;
+  }
+  .clients-page .users-table td:first-child {
+    border-bottom: 1px solid #edf1f6;
+    display: block;
+    grid-column: 1 / -1;
+    margin-bottom: 1px;
+    padding: 2px 0 9px;
+  }
+  .clients-page .users-table td:first-child::before { display: none; }
+  .clients-page .users-table td:first-child strong { font-size: 13px; }
+  .clients-page .users-table td[data-label="Celular / WhatsApp"] { grid-column: 1; }
+  .clients-page .users-table td[data-label="ID"] { grid-column: 2; }
+  .clients-page .users-table .user-email-value {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+  .clients-page .users-table td[data-label="Acciones"] {
+    border-top: 1px solid #edf1f6;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    margin-top: 2px;
+    padding-top: 10px;
+  }
+  .clients-page .users-table td[data-label="Acciones"]::before { margin-right: auto; }
+  .clients-page .users-table .table-action { font-size: 11px; min-height: 38px; padding: 8px 12px; }
+  .clients-page .users-footer { gap: 10px; padding: 12px 14px; }
+  .clients-page .user-modal input,
+  .clients-page .user-modal select { font-size: 16px; }
+}
+
+@media (max-width: 380px) {
+  .clients-page .users-footer { align-items: flex-start; flex-direction: column; }
+}

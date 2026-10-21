@@ -38,7 +38,10 @@ async function loadWorkspace() {
     };
   }
 
-  const sessionSnapshot = await getDoc(doc(db, "sesionesVenta", activeId));
+  const [sessionSnapshot, reservationsSnapshot] = await Promise.all([
+    getDoc(doc(db, "sesionesVenta", activeId)),
+    getDocs(query(collection(db, "apartados"), where("idVenta", "==", activeId))),
+  ]);
   if (!sessionSnapshot.exists()) {
     return {
       session: null,
@@ -48,7 +51,6 @@ async function loadWorkspace() {
     };
   }
 
-  const reservationsSnapshot = await getDocs(query(collection(db, "apartados"), where("idVenta", "==", sessionSnapshot.id)));
   const sessionRecord = fromSnapshot(sessionSnapshot);
   const activeReservations = reservationsSnapshot.docs
     .map(fromSnapshot)
@@ -125,21 +127,23 @@ export default function Ventas() {
       setLoading(true);
       setError("");
       try {
-        const [profileSnapshot, productsSnapshot] = await Promise.all([
-          getDoc(doc(db, "usuarios", currentUser.uid)),
-          getDocs(collection(db, "productos")),
-        ]);
+        const profileSnapshot = await getDoc(doc(db, "usuarios", currentUser.uid));
         if (!mounted) return;
 
         const userProfile = profileSnapshot.exists() ? profileSnapshot.data() : null;
         setProfile(userProfile);
-        setProducts(productsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
         if (!salesRole(userProfile?.rol) || userProfile?.activo !== true) {
           setError("Tu usuario no tiene permiso para operar ventas.");
           return;
         }
 
-        let workspace = await loadWorkspace();
+        const [productsSnapshot, initialWorkspace] = await Promise.all([
+          getDocs(collection(db, "productos")),
+          loadWorkspace(),
+        ]);
+        if (!mounted) return;
+        setProducts(productsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+        let workspace = initialWorkspace;
         const role = String(userProfile?.rol || "").trim().toLowerCase();
         if (workspace.session?.needsCounterMigration && ["admin", "administrador"].includes(role)) {
           const sessionRef = doc(db, "sesionesVenta", workspace.session.id);
