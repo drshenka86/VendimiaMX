@@ -1,0 +1,484 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userProfilePath() {
+      return /databases/$(database)/documents/usuarios/$(request.auth.uid);
+    }
+
+    function isActiveUser() {
+      return isSignedIn()
+        && exists(userProfilePath())
+        && get(userProfilePath()).data.activo == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(userProfilePath())
+        && get(userProfilePath()).data.rol in ['admin', 'Admin', 'ADMIN', 'administrador', 'Administrador', 'ADMINISTRADOR']
+        && get(userProfilePath()).data.activo == true;
+    }
+
+    function isSalesOperator() {
+      return isSignedIn()
+        && exists(userProfilePath())
+        && get(userProfilePath()).data.rol in [
+          'admin', 'Admin', 'ADMIN', 'administrador', 'Administrador', 'ADMINISTRADOR',
+          'vendedor', 'Vendedor', 'VENDEDOR'
+        ]
+        && get(userProfilePath()).data.activo == true;
+    }
+
+    function validReceiptPaymentSettings() {
+      let data = request.resource.data;
+      return data.keys().hasAll([
+          'banco', 'titular', 'cuenta', 'clabe', 'tarjeta', 'instruccionesPago', 'conceptoPago'
+        ])
+        && data.keys().hasOnly([
+          'banco', 'titular', 'cuenta', 'clabe', 'tarjeta', 'instruccionesPago', 'conceptoPago'
+        ])
+        && data.banco is string && data.banco.size() > 0 && data.banco.size() <= 60
+        && data.titular is string && data.titular.size() > 0 && data.titular.size() <= 80
+        && data.cuenta is string && data.cuenta.size() > 0 && data.cuenta.size() <= 40
+        && data.clabe is string && data.clabe.size() > 0 && data.clabe.size() <= 40
+        && data.tarjeta is string && data.tarjeta.size() > 0 && data.tarjeta.size() <= 40
+        && data.instruccionesPago is string && data.instruccionesPago.size() > 0 && data.instruccionesPago.size() <= 80
+        && data.conceptoPago is string && data.conceptoPago.size() > 0 && data.conceptoPago.size() <= 100;
+    }
+
+    function activeSessionPath() {
+      return /databases/$(database)/documents/configuracionVentas/sesionActiva;
+    }
+
+    function salesSessionPath(idVenta) {
+      return /databases/$(database)/documents/sesionesVenta/$(idVenta);
+    }
+
+    function productPath(idProducto) {
+      return /databases/$(database)/documents/productos/$(idProducto);
+    }
+
+    function reservationPath(idApartado) {
+      return /databases/$(database)/documents/apartados/$(idApartado);
+    }
+
+    function reservationMatchesProduct(idApartado, idProducto) {
+      let apartado = getAfter(reservationPath(idApartado)).data;
+      let productoAnterior = get(productPath(idProducto)).data;
+      let productoNuevo = getAfter(productPath(idProducto)).data;
+      let sesionAnterior = get(salesSessionPath(apartado.idVenta)).data;
+      let sesionNueva = getAfter(salesSessionPath(apartado.idVenta)).data;
+      let restante = productoAnterior.get('cantidad', 1) - apartado.cantidad;
+      return !exists(reservationPath(idApartado))
+        && existsAfter(reservationPath(idApartado))
+        && exists(productPath(idProducto))
+        && sesionAnterior.estatus == 'ABIERTA'
+        && sesionNueva.estatus == 'ABIERTA'
+        && sesionNueva.apartadosActivos == sesionAnterior.apartadosActivos + 1
+        && sesionNueva.ultimoApartadoId == idApartado
+        && apartado.idProducto == idProducto
+        && apartado.estatus == 'APARTADO'
+        && productoNuevo.ultimaAsignacionId == idApartado
+        && productoNuevo.cantidad == restante
+        && productoNuevo.precioVenta == apartado.precioUnitario
+        && productoNuevo.estatus == (restante == 0 ? 'APARTADO' : 'DISPONIBLE');
+    }
+
+    function reservationMatchesAccumulation(idApartado, idProducto) {
+      let apartadoAnterior = get(reservationPath(idApartado)).data;
+      let apartadoNuevo = getAfter(reservationPath(idApartado)).data;
+      let productoAnterior = get(productPath(idProducto)).data;
+      let productoNuevo = getAfter(productPath(idProducto)).data;
+      let sesionAnterior = get(salesSessionPath(apartadoAnterior.idVenta)).data;
+      let sesionNueva = getAfter(salesSessionPath(apartadoAnterior.idVenta)).data;
+      let restante = productoAnterior.get('cantidad', 1)
+        - (apartadoNuevo.cantidad - apartadoAnterior.cantidad);
+
+      return exists(reservationPath(idApartado))
+        && existsAfter(reservationPath(idApartado))
+        && apartadoAnterior.estatus == 'APARTADO'
+        && apartadoNuevo.diff(apartadoAnterior).affectedKeys().hasOnly(['cantidad'])
+        && apartadoNuevo.cantidad is int
+        && apartadoNuevo.cantidad > 0
+        && apartadoNuevo.cantidad != apartadoAnterior.cantidad
+        && apartadoNuevo.idVenta == apartadoAnterior.idVenta
+        && apartadoNuevo.idProducto == idProducto
+        && apartadoNuevo.idCliente == apartadoAnterior.idCliente
+        && apartadoNuevo.precioUnitario == apartadoAnterior.precioUnitario
+        && apartadoNuevo.nombreCliente == apartadoAnterior.nombreCliente
+        && sesionAnterior.estatus == 'ABIERTA'
+        && sesionNueva.estatus == 'ABIERTA'
+        && sesionAnterior.apartadosActivos > 0
+        && sesionNueva.apartadosActivos == sesionAnterior.apartadosActivos
+        && sesionNueva.ultimoApartadoId == idApartado
+        && productoNuevo.ultimaAsignacionId == idApartado
+        && restante >= 0
+        && productoNuevo.cantidad == restante
+        && productoNuevo.precioVenta == apartadoNuevo.precioUnitario
+        && productoNuevo.estatus == (restante == 0 ? 'APARTADO' : 'DISPONIBLE')
+        && productoNuevo.diff(productoAnterior).affectedKeys().hasOnly([
+          'cantidad', 'precioVenta', 'estatus', 'ultimaAsignacionId'
+        ]);
+    }
+
+    function reservationMatchesUnassignment(idApartado, idProducto) {
+      let apartadoAnterior = get(reservationPath(idApartado)).data;
+      let productoAnterior = get(productPath(idProducto)).data;
+      let productoNuevo = getAfter(productPath(idProducto)).data;
+      let sesionAnterior = get(salesSessionPath(apartadoAnterior.idVenta)).data;
+      let sesionNueva = getAfter(salesSessionPath(apartadoAnterior.idVenta)).data;
+      return exists(reservationPath(idApartado))
+        && !existsAfter(reservationPath(idApartado))
+        && apartadoAnterior.estatus == 'APARTADO'
+        && sesionAnterior.estatus == 'ABIERTA'
+        && sesionAnterior.apartadosActivos > 0
+        && sesionNueva.estatus == 'ABIERTA'
+        && sesionNueva.apartadosActivos == sesionAnterior.apartadosActivos - 1
+        && sesionNueva.ultimoApartadoId == idApartado
+        && exists(productPath(idProducto))
+        && productoNuevo.ultimaAsignacionId == idApartado
+        && productoNuevo.cantidad == productoAnterior.get('cantidad', 0) + apartadoAnterior.cantidad
+        && productoNuevo.estatus == 'DISPONIBLE'
+        && productoNuevo.diff(productoAnterior).affectedKeys().hasOnly([
+          'cantidad', 'estatus', 'ultimaAsignacionId'
+        ]);
+    }
+
+    function reservationMatchesClosedAccumulation(idApartado, idProducto) {
+      let apartadoAnterior = get(reservationPath(idApartado)).data;
+      let apartadoNuevo = getAfter(reservationPath(idApartado)).data;
+      let productoAnterior = get(productPath(idProducto)).data;
+      let productoNuevo = getAfter(productPath(idProducto)).data;
+      let sesionAnterior = get(salesSessionPath(apartadoAnterior.idVenta)).data;
+      let sesionNueva = getAfter(salesSessionPath(apartadoAnterior.idVenta)).data;
+      let restante = productoAnterior.get('cantidad', 0)
+        - (apartadoNuevo.cantidad - apartadoAnterior.cantidad);
+
+      return exists(reservationPath(idApartado))
+        && existsAfter(reservationPath(idApartado))
+        && apartadoAnterior.estatus == 'APARTADO'
+        && apartadoNuevo.diff(apartadoAnterior).affectedKeys().hasOnly(['cantidad'])
+        && apartadoNuevo.cantidad is int
+        && apartadoNuevo.cantidad > 0
+        && apartadoNuevo.cantidad != apartadoAnterior.cantidad
+        && apartadoNuevo.idVenta == apartadoAnterior.idVenta
+        && apartadoNuevo.idProducto == idProducto
+        && apartadoNuevo.idCliente == apartadoAnterior.idCliente
+        && apartadoNuevo.precioUnitario == apartadoAnterior.precioUnitario
+        && apartadoNuevo.nombreCliente == apartadoAnterior.nombreCliente
+        && sesionAnterior.estatus == 'CERRADA'
+        && sesionNueva.estatus == 'CERRADA'
+        && sesionNueva.apartadosActivos == sesionAnterior.apartadosActivos
+        && productoAnterior.get('estatus', 'DISPONIBLE') != 'VENDIDO'
+        && restante >= 0
+        && productoNuevo.cantidad == restante
+        && productoNuevo.estatus == (restante == 0 ? 'APARTADO' : 'DISPONIBLE')
+        && productoNuevo.get('ultimaAsignacionId', '') == productoAnterior.get('ultimaAsignacionId', '')
+        && productoNuevo.diff(productoAnterior).affectedKeys().hasOnly(['cantidad', 'estatus']);
+    }
+
+    function reservationMatchesClosedUnassignment(idApartado, idProducto) {
+      let apartadoAnterior = get(reservationPath(idApartado)).data;
+      let productoAnterior = get(productPath(idProducto)).data;
+      let productoNuevo = getAfter(productPath(idProducto)).data;
+      let sesionAnterior = get(salesSessionPath(apartadoAnterior.idVenta)).data;
+      let sesionNueva = getAfter(salesSessionPath(apartadoAnterior.idVenta)).data;
+      let previousAssignmentId = productoAnterior.get('ultimaAsignacionId', '');
+      let updatedAssignmentId = productoNuevo.get('ultimaAsignacionId', '');
+
+      return exists(reservationPath(idApartado))
+        && !existsAfter(reservationPath(idApartado))
+        && apartadoAnterior.estatus == 'APARTADO'
+        && sesionAnterior.estatus == 'CERRADA'
+        && sesionAnterior.apartadosActivos > 0
+        && sesionNueva.estatus == 'CERRADA'
+        && sesionNueva.apartadosActivos == sesionAnterior.apartadosActivos - 1
+        && sesionNueva.ultimoApartadoId == idApartado
+        && productoAnterior.get('estatus', 'DISPONIBLE') != 'VENDIDO'
+        && productoNuevo.cantidad == productoAnterior.get('cantidad', 0) + apartadoAnterior.cantidad
+        && productoNuevo.estatus == 'DISPONIBLE'
+        && ((previousAssignmentId == idApartado
+            && (updatedAssignmentId == ''
+              || (updatedAssignmentId is string
+                && existsAfter(reservationPath(updatedAssignmentId))
+                && getAfter(reservationPath(updatedAssignmentId)).data.idProducto == idProducto
+                && getAfter(reservationPath(updatedAssignmentId)).data.estatus == 'APARTADO')))
+          || (previousAssignmentId != idApartado
+            && updatedAssignmentId == previousAssignmentId))
+        && productoNuevo.diff(productoAnterior).affectedKeys().hasOnly([
+          'cantidad', 'estatus', 'ultimaAsignacionId'
+        ]);
+    }
+
+    function validClosedSessionReservationCounterUpdate(idVenta) {
+      let idApartado = request.resource.data.ultimoApartadoId;
+      let apartadoAnteriorPath = reservationPath(idApartado);
+      let apartadoNuevoPath = reservationPath(idApartado);
+      return request.resource.data.ultimoApartadoId is string
+        && resource.data.estatus == 'CERRADA'
+        && request.resource.data.estatus == 'CERRADA'
+        && resource.data.apartadosActivos > 0
+        && request.resource.data.apartadosActivos == resource.data.apartadosActivos - 1
+        && exists(apartadoAnteriorPath)
+        && !existsAfter(apartadoNuevoPath)
+        && get(apartadoAnteriorPath).data.idVenta == idVenta
+        && reservationMatchesClosedUnassignment(idApartado, get(apartadoAnteriorPath).data.idProducto);
+    }
+
+    function validSessionReservationCounterUpdate(idVenta) {
+      let idApartado = request.resource.data.ultimoApartadoId;
+      let apartadoAnteriorPath = reservationPath(idApartado);
+      let apartadoNuevoPath = reservationPath(idApartado);
+      return request.resource.data.ultimoApartadoId is string
+        && ((request.resource.data.apartadosActivos == resource.data.apartadosActivos
+            && exists(apartadoAnteriorPath)
+            && existsAfter(apartadoNuevoPath)
+            && get(apartadoAnteriorPath).data.idVenta == idVenta
+            && reservationMatchesAccumulation(idApartado, get(apartadoAnteriorPath).data.idProducto))
+          || (request.resource.data.apartadosActivos == resource.data.apartadosActivos + 1
+            && !exists(apartadoAnteriorPath)
+            && existsAfter(apartadoNuevoPath)
+            && getAfter(apartadoNuevoPath).data.idVenta == idVenta
+            && reservationMatchesProduct(idApartado, getAfter(apartadoNuevoPath).data.idProducto))
+          || (resource.data.apartadosActivos > 0
+            && request.resource.data.apartadosActivos == resource.data.apartadosActivos - 1
+            && exists(apartadoAnteriorPath)
+            && !existsAfter(apartadoNuevoPath)
+            && get(apartadoAnteriorPath).data.idVenta == idVenta
+            && reservationMatchesUnassignment(idApartado, get(apartadoAnteriorPath).data.idProducto)));
+    }
+
+    function validReservationCreate(idApartado) {
+      let apartado = request.resource.data;
+      let productoRef = productPath(apartado.idProducto);
+      let clienteRef = /databases/$(database)/documents/clientes/$(apartado.idCliente);
+      let sessionRef = salesSessionPath(apartado.idVenta);
+      let productoAnterior = get(productoRef).data;
+      let restante = productoAnterior.get('cantidad', 1) - apartado.cantidad;
+      return apartado.keys().hasAll([
+          'idVenta', 'idCliente', 'nombreCliente', 'idProducto', 'codigoProducto',
+          'producto', 'cantidad', 'precioUnitario', 'estatus', 'fechaApartado', 'creadoPor'
+        ])
+        && apartado.keys().hasOnly([
+          'idVenta', 'idCliente', 'nombreCliente', 'idProducto', 'codigoProducto',
+          'producto', 'cantidad', 'precioUnitario', 'estatus', 'fechaApartado', 'creadoPor'
+        ])
+        && apartado.idVenta is string
+        && apartado.idCliente is string
+        && apartado.idProducto is string
+        && apartado.nombreCliente is string
+        && apartado.nombreCliente.size() > 0
+        && apartado.cantidad is int
+        && apartado.cantidad > 0
+        && apartado.precioUnitario >= 0
+        && apartado.estatus == 'APARTADO'
+        && apartado.fechaApartado == request.time
+        && apartado.creadoPor == request.auth.uid
+        && exists(activeSessionPath())
+        && get(activeSessionPath()).data.idVenta == apartado.idVenta
+        && exists(sessionRef)
+        && get(sessionRef).data.estatus == 'ABIERTA'
+        && exists(productoRef)
+        && productoAnterior.get('cantidad', 1) >= apartado.cantidad
+        && productoAnterior.get('estatus', 'DISPONIBLE') != 'APARTADO'
+        && productoAnterior.get('estatus', 'DISPONIBLE') != 'VENDIDO'
+        && productoAnterior.get('estatus', 'DISPONIBLE') != 'CANCELADO'
+        && apartado.codigoProducto == productoAnterior.get('codigoProducto', apartado.idProducto)
+        && apartado.producto == productoAnterior.get('producto', 'Producto')
+        && existsAfter(clienteRef)
+        && getAfter(clienteRef).data.nombre == apartado.nombreCliente
+        && reservationMatchesProduct(idApartado, apartado.idProducto)
+        && restante >= 0;
+    }
+
+    match /usuarios/{userId} {
+      allow get: if isSignedIn()
+        && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if false;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nombre', 'email', 'rol', 'activo'
+        ])
+        || (isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nombre']));
+      allow delete: if false;
+    }
+
+    match /productos/{productoId} {
+      allow read: if isActiveUser();
+      allow create: if isAdmin();
+      allow delete: if false;
+      allow update: if isAdmin()
+        || (isSalesOperator()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'cantidad', 'precioVenta', 'estatus', 'ultimaAsignacionId'
+          ])
+          && request.resource.data.ultimaAsignacionId is string
+          && (reservationMatchesProduct(request.resource.data.ultimaAsignacionId, productoId)
+            || reservationMatchesAccumulation(request.resource.data.ultimaAsignacionId, productoId)
+            || reservationMatchesUnassignment(request.resource.data.ultimaAsignacionId, productoId)));
+    }
+
+    match /pallets/{palletId} {
+      allow read: if isActiveUser();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /clientes/{clienteId} {
+      allow read: if isSalesOperator();
+      allow create: if isSalesOperator()
+        && request.resource.data.keys().hasAll(['id', 'nombre', 'codigoPais', 'celular', 'fecha_alta', 'creadoPor'])
+        && request.resource.data.keys().hasOnly([
+          'id', 'nombre', 'codigoPais', 'celular', 'aceptaWhatsApp', 'whatsappConsentAt', 'fecha_alta', 'creadoPor'
+        ])
+        && request.resource.data.id == clienteId
+        && request.resource.data.codigoPais is string
+        && request.resource.data.codigoPais.matches('^\\+[1-9][0-9]{0,2}$')
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 150
+        && (request.resource.data.celular == null
+          || (request.resource.data.celular is string
+            && request.resource.data.celular.size() <= 30))
+        && request.resource.data.aceptaWhatsApp is bool
+        && ((request.resource.data.aceptaWhatsApp == true
+            && request.resource.data.whatsappConsentAt == request.time)
+          || (request.resource.data.aceptaWhatsApp == false
+            && request.resource.data.whatsappConsentAt == null))
+        && request.resource.data.fecha_alta == request.time
+        && request.resource.data.creadoPor == request.auth.uid;
+      allow update: if isAdmin()
+        && request.resource.data.keys().hasAll(['id', 'nombre', 'codigoPais', 'celular'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'id', 'nombre', 'codigoPais', 'celular', 'aceptaWhatsApp', 'whatsappConsentAt'
+        ])
+        && request.resource.data.id == clienteId
+        && request.resource.data.codigoPais is string
+        && request.resource.data.codigoPais.matches('^\\+[1-9][0-9]{0,2}$')
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 150
+        && (request.resource.data.celular == null
+          || (request.resource.data.celular is string
+            && request.resource.data.celular.size() <= 30))
+        && request.resource.data.aceptaWhatsApp is bool
+        && ((request.resource.data.aceptaWhatsApp == true
+            && request.resource.data.whatsappConsentAt == request.time)
+          || (request.resource.data.aceptaWhatsApp == false
+            && request.resource.data.whatsappConsentAt == null));
+      allow delete: if false;
+    }
+
+    match /sesionesVenta/{idVenta} {
+      allow read: if isSalesOperator();
+      allow create: if isSalesOperator()
+        && request.resource.data.keys().hasAll([
+          'estatus', 'apartadosActivos', 'ultimoApartadoId', 'fechaInicio', 'fechaCierre', 'creadoPor'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'estatus', 'apartadosActivos', 'ultimoApartadoId', 'fechaInicio', 'fechaCierre', 'creadoPor'
+        ])
+        && request.resource.data.estatus == 'ABIERTA'
+        && request.resource.data.apartadosActivos == 0
+        && request.resource.data.ultimoApartadoId == null
+        && request.resource.data.fechaInicio == request.time
+        && request.resource.data.fechaCierre == null
+        && request.resource.data.creadoPor == request.auth.uid
+        && existsAfter(activeSessionPath())
+        && getAfter(activeSessionPath()).data.idVenta == idVenta;
+      allow update: if (isSalesOperator()
+        && resource.data.estatus == 'ABIERTA'
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'estatus', 'fechaCierre', 'cerradoPor'
+            ])
+            && resource.data.apartadosActivos > 0
+            && request.resource.data.estatus == 'CERRADA'
+            && request.resource.data.fechaCierre == request.time
+            && request.resource.data.cerradoPor == request.auth.uid
+            && exists(activeSessionPath())
+            && get(activeSessionPath()).data.idVenta == idVenta
+            && !existsAfter(activeSessionPath()))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'apartadosActivos', 'ultimoApartadoId'
+            ])
+            && request.resource.data.estatus == 'ABIERTA'
+            && validSessionReservationCounterUpdate(idVenta))
+          || (isAdmin()
+            && !resource.data.keys().hasAny(['apartadosActivos', 'ultimoApartadoId'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'apartadosActivos', 'ultimoApartadoId'
+            ])
+            && request.resource.data.estatus == 'ABIERTA'
+            && request.resource.data.apartadosActivos is int
+            && request.resource.data.apartadosActivos >= 0
+            && request.resource.data.ultimoApartadoId == null
+            && exists(activeSessionPath())
+            && get(activeSessionPath()).data.idVenta == idVenta)))
+        || (isAdmin()
+          && resource.data.estatus == 'CERRADA'
+          && request.resource.data.estatus == 'CERRADA'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'apartadosActivos', 'ultimoApartadoId'
+          ])
+          && validClosedSessionReservationCounterUpdate(idVenta));
+      allow delete: if isSalesOperator()
+        && resource.data.estatus == 'ABIERTA'
+        && resource.data.apartadosActivos == 0
+        && exists(activeSessionPath())
+        && get(activeSessionPath()).data.idVenta == idVenta
+        && !existsAfter(activeSessionPath());
+    }
+
+    match /configuracionVentas/{configId} {
+      allow read: if isSalesOperator();
+      allow create: if isSalesOperator()
+        && configId == 'sesionActiva'
+        && request.resource.data.keys().hasOnly(['idVenta'])
+        && request.resource.data.idVenta is string
+        && existsAfter(salesSessionPath(request.resource.data.idVenta))
+        && getAfter(salesSessionPath(request.resource.data.idVenta)).data.estatus == 'ABIERTA'
+        && getAfter(salesSessionPath(request.resource.data.idVenta)).data.creadoPor == request.auth.uid;
+      allow delete: if isSalesOperator()
+        && configId == 'sesionActiva'
+        && resource.data.idVenta is string
+        && ((!existsAfter(salesSessionPath(resource.data.idVenta))
+            && get(salesSessionPath(resource.data.idVenta)).data.estatus == 'ABIERTA'
+            && get(salesSessionPath(resource.data.idVenta)).data.apartadosActivos == 0)
+          || (existsAfter(salesSessionPath(resource.data.idVenta))
+            && getAfter(salesSessionPath(resource.data.idVenta)).data.estatus == 'CERRADA'));
+      allow update: if false;
+    }
+
+    match /configuracionRecibos/{configId} {
+      allow read: if configId == 'datosPago' && isSalesOperator();
+      allow create, update: if configId == 'datosPago'
+        && isAdmin()
+        && validReceiptPaymentSettings();
+      allow delete: if false;
+    }
+
+    match /apartados/{idApartado} {
+      allow read: if isSalesOperator();
+      allow create: if isSalesOperator() && validReservationCreate(idApartado);
+      allow update: if (isSalesOperator()
+          && reservationMatchesAccumulation(idApartado, resource.data.idProducto))
+        || (isAdmin()
+          && reservationMatchesClosedAccumulation(idApartado, resource.data.idProducto))
+        || (isSalesOperator()
+          && resource.data.estatus == 'APARTADO'
+          && request.resource.data.estatus == 'PAGADO'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estatus']));
+      allow delete: if (isSalesOperator()
+          && reservationMatchesUnassignment(idApartado, resource.data.idProducto))
+        || (isAdmin()
+          && reservationMatchesClosedUnassignment(idApartado, resource.data.idProducto));
+    }
+
+  }
+}
